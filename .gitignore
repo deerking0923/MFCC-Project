@@ -1,0 +1,13 @@
+# 가상환경 무시
+venv/
+.env/
+
+# 파이썬 캐시 파일 무시
+__pycache__/
+*.py[cod]
+
+# Jupyter 노트북 체크포인트 무시
+.ipynb_checkpoints/
+
+# 기타 IDE 설정파일 무시 (예: VSCode)
+.vscode/

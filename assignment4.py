@@ -56,29 +56,41 @@ for fold in range(N_FOLDS):
     Xtr_f, Xtr_m = [], []
     y_test, y_pred = [], []
 
+    # ── ① train / test split ──
     for path, lab in zip(wav_files, wav_labels):
         chunks = time_chunks(extract_mfcc(path), N_FOLDS)
-        train  = np.vstack([c for i,c in enumerate(chunks) if i!=fold])
-        test   = chunks[fold]
+        train  = np.vstack([c for i,c in enumerate(chunks) if i != fold])
+        (Xtr_f if lab == 1 else Xtr_m).append(train)
+        y_test.append(lab)              # GT for this file (파일 단위)
 
-        (Xtr_f if lab==1 else Xtr_m).append(train)
-        y_test.append(lab)          # GT for this file later
-
-    # ── GMM 학습
+    # ── ② 두 GMM 학습 ──
     gmm_f = GaussianMixture(N_COMPONENT, covariance_type='diag',
                             max_iter=200, random_state=0).fit(np.vstack(Xtr_f))
     gmm_m = GaussianMixture(N_COMPONENT, covariance_type='diag',
                             max_iter=200, random_state=0).fit(np.vstack(Xtr_m))
 
-    # ── fold 평가
+    # ── ③ fold 평가 ──
+    print(f"\n── Fold {fold+1} ─────────────────────────────────────────")
+    print(f"{'File':<8} {'logF':>10} {'logM':>10}  Pred  True  Hit")
+    y_pred.clear()        # 비워 준 뒤 다시 채우기
     for path, lab in zip(wav_files, wav_labels):
-        test = time_chunks(extract_mfcc(path), N_FOLDS)[fold]
-        y_pred.append(1 if gmm_f.score(test) > gmm_m.score(test) else 0)
+        test_feat = time_chunks(extract_mfcc(path), N_FOLDS)[fold]
+        log_f = gmm_f.score(test_feat)        # frame-avg log-likelihood
+        log_m = gmm_m.score(test_feat)
 
+        pred  = 1 if log_f > log_m else 0
+        y_pred.append(pred)
+
+        hit   = '✔' if pred == lab else '✘'
+        fname = os.path.basename(path)
+        print(f"{fname:<8} {log_f:10.2f} {log_m:10.2f}    {pred:^3}   {lab:^3}   {hit}")
+
+    # ── ④ fold 정확도 ──
     acc = accuracy_score(y_test, y_pred)
-    print(f"Fold {fold+1}:  accuracy = {acc*100:.2f} %")
     fold_acc.append(acc)
+    print(f"Fold {fold+1} accuracy = {acc*100:.2f} %")
 
+# ───────── 결과 요약 ─────────
 print("\n=== 4-fold 평균 성능 ===")
 print(f"평균 정확도 : {np.mean(fold_acc)*100:.2f} %")
 print(f"표준편차    : {np.std(fold_acc)*100:.2f} %")

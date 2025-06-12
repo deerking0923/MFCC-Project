@@ -5,7 +5,7 @@ import librosa
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics  import accuracy_score
 
-# ---------- 파라미터 ----------
+#파라미터
 SR      = 16000
 N_MFCC  = 20
 N_MIX   = 8
@@ -13,7 +13,7 @@ FOLD    = 4
 WIN     = int(0.025*SR)   # 25 ms
 HOP     = int(0.010*SR)   # 10 ms
 
-# ---------- 함수 ----------
+#함수
 def get_mfcc(path):
     y, _ = librosa.load(path, sr=SR, mono=True)
     m = librosa.feature.mfcc(y, sr=SR, n_mfcc=N_MFCC,
@@ -24,15 +24,15 @@ def split4(arr):
     step = math.ceil(len(arr)/4)
     return [arr[i*step:(i+1)*step] for i in range(4)]
 
-# ---------- 데이터 읽기 ----------
+#데이터 읽기
 wav_dir = 'wav'                       # 폴더 안에 10 개 wav
 paths   = sorted(glob.glob(os.path.join(wav_dir, '*.wav')))
-assert len(paths) == 10, 'wav 폴더에 파일이 10 개여야 합니다'
+#assert len(paths) == 10, 'wav 폴더에 파일이 10 개여야 합니다'
 
-mfcc_parts = [split4(get_mfcc(p)) for p in paths]  # 미리 계산 · 캐시
-labels     = list(range(10))                       # 0~9 = 학생 ID
+mfcc_parts = [split4(get_mfcc(p)) for p in paths]  
+labels     = list(range(10))                      
 
-# ---------- 교차검증 ----------
+#교차검증
 fold_acc = []
 
 for fd in range(FOLD):
@@ -40,7 +40,7 @@ for fd in range(FOLD):
     train_sets = []
     for idx in range(10):
         parts = [mfcc_parts[idx][i] for i in range(4) if i != fd]
-        train_sets.append(np.vstack(parts))        # (총프레임, 20)
+        train_sets.append(np.vstack(parts))
 
     # 2) 10 개 GMM 학습
     models = []
@@ -51,16 +51,22 @@ for fd in range(FOLD):
 
     # 3) 테스트 & 예측
     y_true, y_pred = [], []
+    # print(f"\n── Fold {fd+1} ──────────────────────────────────────")
+    # print("file\t\ttrue\t" + " ".join([f"M{i}" for i in range(10)]) + "\tpred")
     for idx in range(10):
-        test_feat = mfcc_parts[idx][fd]            # ¼ 구간
+        test_feat = mfcc_parts[idx][fd]            # 분할할 구간
         scores = [m.score(test_feat) for m in models]
         y_pred.append(int(np.argmax(scores)))
         y_true.append(idx)
+        # pred_id = int(np.argmax(scores))
+        # score_line = " ".join([f"{s:6.2f}" for s in scores])
+        # print(f"{os.path.basename(paths[idx]):8s}\t{idx}\t{score_line}\t{pred_id}")
+
 
     acc = accuracy_score(y_true, y_pred)
     fold_acc.append(acc)
     print(f'fold{fd+1}: {acc*100:.1f}%  preds={y_pred}')
 
-# ---------- 결과 ----------
+#결과
 print(f'avg : {np.mean(fold_acc)*100:.1f}%')
 print(f'std : {np.std(fold_acc)*100:.1f}%')
